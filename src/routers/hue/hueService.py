@@ -11,9 +11,11 @@ from colormath.color_conversions import convert_color
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
-class HueEndPointType(Enum):
+class HueEndPointTyp(Enum):
     ROOM = 'room'
     LIGHT = 'light'
+    GROUP = 'grouped_light'
+
 
 class Light:
     def __init__(self, rid:str, name = '', on=False) -> None:
@@ -44,7 +46,7 @@ class Hue:
     rooms: [Room] = []
 
     def __init__(self) -> None:
-        rooms = self.api_call_hue(HueEndPointType.ROOM)
+        rooms = self.get_api_call_hue(HueEndPointTyp.ROOM)
 
         for room in rooms:
             if(room['type'] == 'room'):
@@ -65,7 +67,7 @@ class Hue:
                         light.coordinate = coordinates[light.id]
 
     def update_rooms(self):
-        lights = self.api_call_hue(HueEndPointType.LIGHT)
+        lights = self.get_api_call_hue(HueEndPointTyp.LIGHT)
 
         for light in lights:
             for room in self.rooms:
@@ -78,7 +80,8 @@ class Hue:
                             room_light.brightness = light['dimming']['brightness']
                         if 'color' in light and 'xy' in light['color']:
                             room_light.color = self.convert_xy_to_rgb(light['color']['xy']['x'], light['color']['xy']['y'])
-                        if room_light.on: room.on=True
+                        if room_light.on: room.on = True
+                        else: room.on = False
                             
     def read_coordinate_file(self):
         coordinates = {}
@@ -93,6 +96,21 @@ class Hue:
     def get_rooms_from_hue(self):
         self.update_rooms()
         return self.rooms
+    
+    def set_room(self, room_id):
+        set_state = False
+
+        for room in self.rooms:
+            if room.id == room_id:
+                set_state = room.on
+
+        body = {
+            "on": {
+                "on": not set_state
+            }
+        }
+
+        return  self.put_api_call_hue(HueEndPointTyp.GROUP, room_id, body)
 
     def convert_xy_to_rgb(self, x: int, y: int):
         cie_color = xyYColor(x, y, 1.0)
@@ -109,17 +127,17 @@ class Hue:
         y=cie_color.xyy_y
         return [x, y]
 
-    def api_call_hue(self, endPoint: HueEndPointType):
+    def get_api_call_hue(self, endPoint: HueEndPointTyp):
         ip = os.getenv("HUE_BRIDGE_IP")
         user = os.getenv("HUE_BRIDGE_USER")
         url = f'https://{ip}/clip/v2/resource/{endPoint.value}'
+
         headers = {
             'hue-application-key': user
         }
 
         try:
             response = requests.get(url, headers=headers, verify=False)
-
             if response.status_code == 200:
                 data = response.json()
             else:
@@ -129,3 +147,26 @@ class Hue:
             print('Requests error:', e)
 
         return data['data']
+    
+    def put_api_call_hue(self, endPoint: HueEndPointTyp, parameter, body):
+        ip = os.getenv("HUE_BRIDGE_IP")
+        user = os.getenv("HUE_BRIDGE_USER")
+        url = f'https://{ip}/clip/v2/resource/{endPoint.value}/{parameter}'
+
+        headers = {
+            'hue-application-key': user
+        }
+
+        print(url)
+
+        try:
+            response = requests.put(url, headers=headers, json=body, verify=False)
+            if response.status_code == 200:
+                data = response.json()
+                return data
+            else:
+                print(f'Request failed with status: {response.status_code}')
+        except requests.exceptions.RequestException as e:
+            # Handle any errors that occurred during the request
+            print('Requests error:', e)
+
