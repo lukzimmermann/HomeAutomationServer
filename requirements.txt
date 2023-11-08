@@ -1,0 +1,7 @@
+numpy==1.14.3
+python-dotenv
+requests
+fastapi
+uvicorn
+urllib3
+colormath

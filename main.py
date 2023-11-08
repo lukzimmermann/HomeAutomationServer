@@ -10,10 +10,11 @@ app = FastAPI(title="HomeAutomationServer", description=description)
 app.include_router(hue.router)
 
 origins = [
-    "http://localhost.tiangolo.com",
-    "https://localhost.tiangolo.com",
     "http://localhost",
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1",
+    "http://localhost"
 ]
 
 app.add_middleware(
