@@ -135,7 +135,7 @@ class Hue:
         headers = {
             'hue-application-key': user
         }
-
+        data = []
         try:
             response = requests.get(url, headers=headers, verify=False)
             if response.status_code == 200:
