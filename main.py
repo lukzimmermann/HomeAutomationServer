@@ -9,18 +9,9 @@ description = """
 app = FastAPI(title="HomeAutomationServer", description=description)
 app.include_router(hue.router)
 
-origins = [
-    "http://localhost",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1",
-    "http://localhost",
-    "http://192.168.1.130"
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["http://192.168.1.130:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
