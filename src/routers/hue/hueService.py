@@ -98,6 +98,7 @@ class Hue:
         return self.rooms
     
     def set_room(self, room_id):
+        self.update_rooms()
         set_state = False
 
         for room in self.rooms:
@@ -107,10 +108,33 @@ class Hue:
         body = {
             "on": {
                 "on": not set_state
+            },
+            "dimming": {
+                "brightness": 100
             }
         }
 
-        return  self.put_api_call_hue(HueEndPointTyp.GROUP, room_id, body)
+        return self.put_api_call_hue(HueEndPointTyp.GROUP, room_id, body)
+    
+    def cinema_mode(self):
+        room_id = ''
+
+        for room in self.rooms:
+            if room.name == 'Wohnzimmer':
+                room_id = room.id
+        
+        body = {
+            "on": {
+                "on": True
+            },
+            "dimming": {
+                "brightness": 25
+            }
+        }
+
+        if room_id != '':
+            return self.put_api_call_hue(HueEndPointTyp.GROUP, room_id, body)
+
 
     def convert_xy_to_rgb(self, x: int, y: int):
         cie_color = xyYColor(x, y, 1.0)

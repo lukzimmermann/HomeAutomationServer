@@ -13,3 +13,7 @@ async def getLights():
 @router.put("/setRoom/{room_id}")
 async def setRoom(room_id):
     return hue.set_room(room_id)
+
+@router.get("/cinema/")
+async def setRoom():
+    return hue.cinema_mode()
