@@ -11,8 +11,9 @@ app.include_router(hue.router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://192.168.1.130:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+

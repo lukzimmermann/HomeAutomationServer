@@ -1,9 +1,13 @@
+import math
 import requests
 import os
 import ast
 from dotenv import load_dotenv
 from enum import Enum
+import threading
+import time
 import urllib3
+import uuid
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from colormath.color_objects import xyYColor, sRGBColor
 from colormath.color_conversions import convert_color
@@ -44,6 +48,7 @@ load_dotenv()
 
 class Hue:
     rooms: [Room] = []
+    threads = {}
 
     def __init__(self) -> None:
         rooms = self.get_api_call_hue(HueEndPointTyp.ROOM)
@@ -135,6 +140,121 @@ class Hue:
         if room_id != '':
             return self.put_api_call_hue(HueEndPointTyp.GROUP, room_id, body)
 
+    def dimm_light(self, light_id, duration, brightness):
+        unique_id = str(uuid.uuid4())
+        print(unique_id)
+        exit_flag = threading.Event()
+        thread = threading.Thread(target=self.dimm_light_thread, name=unique_id,
+                                  args=(light_id, duration, brightness, exit_flag))
+        self.threads[unique_id] = (thread, exit_flag)
+        thread.start()
+        return {"automation_id": unique_id}
+        
+    def dimm_light_thread(self, light_id, duration, brightness, exit_flag):
+        MIN_INTERVAL_TIME =  1
+        interval_time = -1
+        step_size = 1
+
+        if brightness == -1:
+            light_state = self.get_light_state(light_id)
+            brightness = light_state.brightness
+
+        if brightness <= 0:
+            print('Cant dimm if brightness less than 1!')
+            return 
+
+        while not exit_flag.is_set():
+            while True:
+                interval_time = duration / (brightness / step_size)
+                if interval_time > MIN_INTERVAL_TIME:
+                    break
+                else:
+                    step_size += 1
+
+            self.set_light(light_id, True, brightness)
+
+            has_changed = False
+
+            while brightness >= 0 and not exit_flag.is_set():
+                self.set_light(light_id, True, brightness)
+
+                time.sleep(interval_time)
+
+                light_state = self.get_light_state(light_id)
+                brightness_difference = math.fabs(light_state.brightness - brightness)
+                if brightness_difference > 5 or not light_state.on:
+                    print('stop automation, state has changed...')
+                    has_changed = True
+                    break
+
+                brightness -= step_size
+
+            if not has_changed and brightness <= 0 and not exit_flag.is_set():
+                self.set_light(light_id, False, 0)
+                self.set_light(light_id, False, 100)
+
+            exit_flag.set()
+
+
+    def set_light(self, id:str, state: bool, brightness:int = -1):
+        body = {}
+
+        if brightness == -1:
+            body = {
+                    "on": {
+                        "on": state
+                    }
+                }
+        else:
+            body = {
+                "on": {
+                    "on": state
+                },
+                "dimming": {
+                    "brightness": brightness
+                }
+            }
+
+        self.put_api_call_hue(HueEndPointTyp.LIGHT, id, body)
+
+    def get_automation_state(self, automation_id=0):
+        alive_threads = {}
+
+        # Remove terminated threads from the dictionary
+        for thread_name, thread_info in list(self.threads.items()):
+            thread, exit_flag = thread_info
+            if thread.is_alive():
+                alive_threads[thread_name] = thread_info
+
+        self.threads = alive_threads  # Update the threads dictionary
+
+        if not self.threads:
+            return {"status": "no automation running"}
+
+        if automation_id == 0:
+            # Check the state of all threads
+            response_json_array = [{"id": thread_name, "is_alive": thread_info[0].is_alive()} for thread_name, thread_info in self.threads.items()]
+        else:
+            # Check the state of a specific thread
+            response_json_array = {"status": "alive"} if str(automation_id) in self.threads else [{"status": "not found"}]
+
+        return response_json_array
+
+    
+    def stop_automation(self, automation_id):
+        print(f"Attempting to stop automation: {automation_id}")
+        print(f"Current threads: {self.threads}")
+
+        if automation_id in self.threads:
+            thread, exit_flag = self.threads[automation_id]
+            exit_flag.set()  # Set the flag to signal the thread to exit
+            thread.join()  # Wait for the thread to finish
+            del self.threads[automation_id]
+            print(f"Thread {automation_id} killed.")
+            return {"status": "stopped"}
+
+        print(f"Automation {automation_id} not found in threads.")
+        return {"status": "not found"}
 
     def convert_xy_to_rgb(self, x: int, y: int):
         cie_color = xyYColor(x, y, 1.0)
@@ -185,6 +305,7 @@ class Hue:
 
         try:
             response = requests.put(url, headers=headers, json=body, verify=False)
+            print(response.json())
             if response.status_code == 200:
                 data = response.json()
                 return data
@@ -193,4 +314,35 @@ class Hue:
         except requests.exceptions.RequestException as e:
             # Handle any errors that occurred during the request
             print('Requests error:', e)
+
+    def get_light_state(self, id):
+        ip = os.getenv("HUE_BRIDGE_IP")
+        user = os.getenv("HUE_BRIDGE_USER")
+        url = f'https://{ip}/clip/v2/resource/light/{id}'
+
+        headers = {
+            'hue-application-key': user
+        }
+        data = []
+        try:
+            response = requests.get(url, headers=headers, verify=False)
+            if response.status_code == 200:
+                data = response.json()
+            else:
+                print(f'Request failed with status: {response.status_code}')
+        except requests.exceptions.RequestException as e:
+            # Handle any errors that occurred during the request
+            print('Requests error:', e)
+
+
+        light = Light(-1)
+        light.id = id
+        light.name = data['data'][0]['metadata']['name']
+        light.on = data['data'][0]['on']['on']
+        light.color = data['data'][0]
+        if 'dimming' in data['data'][0]:
+            light.brightness = int(data['data'][0]['dimming']['brightness'])
+
+        return light
+
 

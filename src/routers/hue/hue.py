@@ -1,6 +1,12 @@
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from src.routers.hue.hueService import Hue, Room
+
+class Dimm(BaseModel):
+    light_id: str
+    duration: int
+    brightness: int
 
 hue = Hue()
 
@@ -17,3 +23,19 @@ async def setRoom(room_id):
 @router.get("/cinema/")
 async def setRoom():
     return hue.cinema_mode()
+
+@router.put("/dimm_light")
+async def dimm_light(data: Dimm):
+    return hue.dimm_light(data.light_id, data.duration, data.brightness)
+
+@router.get("/get_automation_state/{automation_id}")
+async def get_automation_state(automation_id):
+    return hue.get_automation_state(automation_id)
+
+@router.get("/get_automation_state/")
+async def get_automation_state():
+    return hue.get_automation_state()
+
+@router.get("/stop_automation/{automation_id}")
+async def stop_automation(automation_id):
+    return hue.stop_automation(automation_id)
