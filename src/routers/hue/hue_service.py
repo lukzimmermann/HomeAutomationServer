@@ -195,7 +195,6 @@ class Hue:
 
             exit_flag.set()
 
-
     def set_light(self, id:str, state: bool, brightness:int = -1):
         body = {}
 
@@ -239,7 +238,6 @@ class Hue:
             response_json_array = {"status": "alive"} if str(automation_id) in self.threads else [{"status": "not found"}]
 
         return response_json_array
-
     
     def stop_automation(self, automation_id):
         print(f"Attempting to stop automation: {automation_id}")
