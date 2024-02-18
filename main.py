@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.routers.hue import hue
 
 description = """
-😎
+First Deployment with k3s and GitHub action😎
 """
 
 app = FastAPI(title="HomeAutomationServer", description=description)

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: homer-server
-          image: lukzimmermann/homeserver:v1.0
+          image: lukzimmermann/homeserver:latest
           ports:
             - containerPort: 8000
           env:
