@@ -162,3 +162,4 @@ cython_debug/
 apicalls
 docker-compose
 docker-command
+*-secret.yaml
