@@ -7,12 +7,12 @@ import os
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 
-from models.model import SensorChannelModel, SensorLogModel, SensorModel, Base
+from models.model import SensorChannelModel, SensorLogModel, SensorModel
 
 
 engine = create_engine(os.getenv("POSTGRES_CONNECTION"))
 
-metadata = Base.metadata
+
 
 s1_ch1 = SensorChannelModel(name='Power Channel1', display_name='Power Firewall', unit='W')
 s1_ch2 = SensorChannelModel(name='Power Channel2', display_name='Power Server', unit='W')

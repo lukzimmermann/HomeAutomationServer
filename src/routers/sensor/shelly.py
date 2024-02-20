@@ -10,6 +10,7 @@ class Type(Enum):
 
 class Data():
     def __init__(self) -> None:
+        self.sensor_id: int
         self.channel: int
         self.status: bool
         self.power: float
@@ -20,18 +21,22 @@ class Data():
         self.temperature: float
 
 class Shelly:
-    def __init__(self, ip, type:Type) -> None:
+    def __init__(self, id, ip, type:Type) -> None:
+        self.id = id
         self.ip = ip
         self.type = type
 
-        if self.type == '1PM': self.number_of_channels = 1
-        if self.type == '2PM': self.number_of_channels = 2
+        if self.type == 'SHELLY_1PM': self.number_of_channels = 1
+        if self.type == 'SHELLY_2PM': self.number_of_channels = 2
 
-        self.dataset = []
+        self.dataset: list[Data] = []
         self.average_dataset = []
 
         self.thread = None
         self.stop_event = threading.Event()
+
+        self.listeners = []
+        self.event = threading.Event()
 
     def get_raw_data(self):
         url = f'http://{self.ip}/rpc'
@@ -48,6 +53,7 @@ class Shelly:
         for i in range(self.number_of_channels):
             channel_name = f'switch:{i}'
             channel = Data()
+            channel.sensor_id = -1
             channel.channel = i
             channel.status = data['result'][channel_name]['output']
             channel.power = data['result'][channel_name]['apower']
@@ -64,71 +70,55 @@ class Shelly:
         self.update_data()
         return self.dataset
     
-    def get_average_data(self) -> list[Data]:
+    def add_listener(self, listener):
+        self.listeners.append(listener)
 
-        data = []
-        
-        for i in range(self.number_of_channels):
-            channel = Data()
-            channel.channel = i
-            channel.status = -1
-            channel.power = self.average_dataset[i].power
-            channel.voltage = self.average_dataset[i].voltage
-            channel.current = self.average_dataset[i].current
-            channel.frequency = self.average_dataset[i].frequency
-            channel.pf = self.average_dataset[i].pf
-            channel.temperature = self.average_dataset[i].temperature
+    def notify_listeners(self, channel_index):
+        for listener in self.listeners:
+            listener.new_data_available(channel_index)
 
-            data.append(channel)
-
-        return data
-    
-    def recording(self, length, interval):
+    def recording(self, log_interval, collection_interval):
         while not self.stop_event.is_set():
+            power_avg = [[] for _ in range(self.number_of_channels)]
+            voltage_avg = [[] for _ in range(self.number_of_channels)]
+            current_avg = [[] for _ in range(self.number_of_channels)]
+            frequency_avg = [[] for _ in range(self.number_of_channels)]
+            pf_avg = [[] for _ in range(self.number_of_channels)]
+            temperature_avg = [[] for _ in range(self.number_of_channels)]
 
-            self.update_data()
+            for _ in range(int(log_interval/collection_interval)):
+                self.update_data()
+                
+                for channel_index in range(self.number_of_channels):
+                    power_avg[channel_index].append(self.dataset[channel_index].power)
+                    voltage_avg[channel_index].append(self.dataset[channel_index].voltage)
+                    current_avg[channel_index].append(self.dataset[channel_index].current)
+                    frequency_avg[channel_index].append(self.dataset[channel_index].frequency)
+                    pf_avg[channel_index].append(self.dataset[channel_index].pf)
+                    temperature_avg[channel_index].append(self.dataset[channel_index].temperature)
 
-            self.average_dataset = []
-            
-            for i, data in enumerate(self.dataset):
+                time.sleep(collection_interval)
 
-                self.average_power[i].append(data.power)
-                self.average_voltage[i].append(data.power)
-                self.average_current[i].append(data.power)
-                self.average_frequency[i].append(data.power)
-                self.average_pf[i].append(data.power)
-                self.average_temperature[i].append(data.power)
+            mean_dataset: list[Data] = []
 
-                if len(self.average_power[i]) > length:
-                    self.average_power[i] = self.average_power[i][1:]
-                    self.average_voltage[i] = self.average_voltage[i][1:]
-                    self.average_current[i] = self.average_current[i][1:]
-                    self.average_frequency[i] = self.average_frequency[i][1:]
-                    self.average_pf[i] = self.average_pf[i][1:]
-                    self.average_temperature[i] = self.average_temperature[i][1:]
+            for index in range(self.number_of_channels):
+                mean_data = Data()
 
-                channel = Data()
-                channel.channel = i
-                channel.status = self.dataset[i].status
-                channel.power = np.mean(self.average_power[i])
-                channel.voltage = np.mean(self.average_voltage[i])
-                channel.current = np.mean(self.average_current[i])
-                channel.frequency = np.mean(self.average_frequency[i])
-                channel.pf = np.mean(self.average_pf[i])
-                channel.temperature = np.mean(self.average_temperature[i])
-                self.average_dataset.append(channel)
+                mean_data.sensor_id = self.id
+                mean_data.channel = index
+                mean_data.power = np.round(np.mean(power_avg[index]),1)
+                mean_data.voltage = np.round(np.mean(voltage_avg[index]),2)
+                mean_data.current = np.round(np.mean(current_avg[index]),3)
+                mean_data.frequency = np.round(np.mean(frequency_avg[index]),2)
+                mean_data.pf = np.round(np.mean(pf_avg[index]),2)
+                mean_data.temperature = np.round(np.mean(temperature_avg[index]),1)
+                
+                mean_dataset.append(mean_data)
 
-            time.sleep(interval)
+            self.notify_listeners(mean_dataset)
 
-    def start_recording(self, length: int, interval: int, log_to_db=False):
-        self.average_power = [[] for _ in range(self.number_of_channels)]
-        self.average_voltage = [[] for _ in range(self.number_of_channels)]
-        self.average_current = [[] for _ in range(self.number_of_channels)]
-        self.average_frequency = [[] for _ in range(self.number_of_channels)]
-        self.average_pf = [[] for _ in range(self.number_of_channels)]
-        self.average_temperature = [[] for _ in range(self.number_of_channels)]
-
-        self.thread = threading.Thread(target=self.recording, args=(length, interval))
+    def start_recording(self, log_interval: int, collection_interval: int, log_to_db=False):
+        self.thread = threading.Thread(target=self.recording, args=(log_interval, collection_interval))
         self.thread.start()
 
     def stop_recording(self):
