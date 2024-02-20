@@ -32,6 +32,7 @@ class SensorChannelModel(Base):
     display_name = Column(String)
     description = Column(String)
     unit = Column(String, nullable=False)
+    is_log_value = Column(Boolean, nullable=False, default=False)
     logs = relationship('SensorLogModel', backref='logs')
 
     def __repr__(self):
@@ -40,6 +41,6 @@ class SensorChannelModel(Base):
 
 class SensorLogModel(Base):
     __tablename__ = 'sensor_log'
-    entry_date = Column(DateTime, primary_key=True, default=datetime.datetime.now())
+    entry_date = Column(DateTime, primary_key=True, default=datetime.datetime.utcnow)
     channel_id = Column(Integer, ForeignKey(SensorChannelModel.id, ondelete='CASCADE'), nullable=False)
     value = Column(Float, nullable=False)

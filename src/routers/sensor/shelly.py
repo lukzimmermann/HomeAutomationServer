@@ -21,7 +21,7 @@ class Data():
         self.temperature: float
 
 class Shelly:
-    def __init__(self, id, ip, type:Type) -> None:
+    def __init__(self, id: int, ip: str, type:Type) -> None:
         self.id = id
         self.ip = ip
         self.type = type
@@ -46,7 +46,7 @@ class Shelly:
 
         return response.json()
 
-    def update_data(self):
+    def update_data(self) -> None:
         data = self.get_raw_data()
 
         dataset = []
@@ -65,19 +65,19 @@ class Shelly:
             dataset.append(channel)
         
         self.dataset = dataset
-    
-    def get_data(self):
+
+    def get_data(self) -> list[Data]:
         self.update_data()
         return self.dataset
-    
+
     def add_listener(self, listener):
         self.listeners.append(listener)
 
-    def notify_listeners(self, channel_index):
+    def notify_listeners(self, dataset: list[Data]):
         for listener in self.listeners:
-            listener.new_data_available(channel_index)
+            listener.new_data_available(dataset)
 
-    def recording(self, log_interval, collection_interval):
+    def recording(self, log_interval: int, collection_interval: int):
         while not self.stop_event.is_set():
             power_avg = [[] for _ in range(self.number_of_channels)]
             voltage_avg = [[] for _ in range(self.number_of_channels)]
@@ -117,11 +117,11 @@ class Shelly:
 
             self.notify_listeners(mean_dataset)
 
-    def start_recording(self, log_interval: int, collection_interval: int, log_to_db=False):
+    def start_recording(self, log_interval: int, collection_interval: int) -> None:
         self.thread = threading.Thread(target=self.recording, args=(log_interval, collection_interval))
         self.thread.start()
 
-    def stop_recording(self):
+    def stop_recording(self) -> None:
         if self.thread is not None and self.thread.is_alive():
             self.stop_event.set()
             self.thread.join()

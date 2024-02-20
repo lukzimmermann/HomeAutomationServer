@@ -3,16 +3,12 @@ import sys
 import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, joinedload
-
 from shelly import Data, Shelly
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.append(parent_dir)
 
 from models.model import SensorLogModel, SensorModel
-
-
-
 
 
 class SensorHandler():
@@ -51,7 +47,7 @@ class SensorHandler():
         
         return None
 
-    def start(self):
+    def start(self) -> None:
         self.stop()
 
         for sensor in self.sensor_list:
@@ -66,27 +62,42 @@ class SensorHandler():
                 shelly.start_recording(sensor.log_interval, sensor.collection_interval)
             else: print('Fuck off')
 
-    def stop(self):
+    def stop(self) -> None:
         for shelly in self.shellys:
             shelly.stop_recording()
             shelly.listeners = []
+
+    def write_log_to_database(self, log: SensorLogModel) -> None:
+        try:
+            engine = create_engine(os.getenv("POSTGRES_CONNECTION"))
+            Session = sessionmaker(bind=engine)
+            session = Session()
+            session.add(log)
+            session.commit()
+        except:
+            print("Error: Could not write log to db")
+        finally:
+            session.close()
     
     class ShellyListener():
         def __init__(self, sensor_handler):
             self.sensor_handler = sensor_handler
 
-        def new_data_available(self, dataset: list[Data]):
-            # Accessing get_sensor_by_id through the outer class instance
+        def new_data_available(self, dataset: list[Data]) -> None:
             sensor: SensorModel = self.sensor_handler.get_sensor_by_id(dataset[0].sensor_id)
 
-            for channel in sensor.channels:
-                if ':' in channel.name:
-                    channel_index = int(channel.name.split(':')[0])
-                    attribute_name = channel.name.split(':')[1]
+            if sensor.is_active:
+                for channel in sensor.channels:
+                    if channel.is_log_value:
+                        if ':' in channel.name:
+                            channel_index = int(channel.name.split(':')[0])
+                            attribute_name = channel.name.split(':')[1]
 
-                log = SensorLogModel()
-                log.channel_id = channel.id
-                log.value = getattr(dataset[channel_index], attribute_name)
+                        log = SensorLogModel()
+                        log.channel_id = channel.id
+                        log.value = getattr(dataset[channel_index], attribute_name)
+                        print(f'{channel.display_name}: {log.value}{channel.unit}')
 
-                print(f'{channel.display_name}: {log.value}{channel.unit}')
-            print()
+                        self.sensor_handler.write_log_to_database(log)
+
+                print()
