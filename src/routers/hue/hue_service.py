@@ -6,14 +6,10 @@ from dotenv import load_dotenv
 from enum import Enum
 import threading
 import time
-import urllib3
 import uuid
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from colormath.color_objects import xyYColor, sRGBColor
 from colormath.color_conversions import convert_color
 
-
-urllib3.disable_warnings(InsecureRequestWarning)
 
 class HueEndPointTyp(Enum):
     ROOM = 'room'
@@ -35,7 +31,7 @@ class Light:
         return f'{self.id}\t{self.name}'
 
 class Room():
-    def __init__(self, id: str, name: str, on: bool, lights: [Light]) -> None:
+    def __init__(self, id: str, name: str, on: bool, lights: list[Light]) -> None:
         self.id = id
         self.name = name
         self.on = on
@@ -47,7 +43,7 @@ class Room():
 load_dotenv()
 
 class Hue:
-    rooms: [Room] = []
+    rooms: list[Room] = []
     threads = {}
 
     def __init__(self) -> None:
@@ -57,7 +53,7 @@ class Hue:
             if(room['type'] == 'room'):
                 id = room['services'][0]['rid']
                 name = room['metadata']['name']
-                lights: [Light] = []
+                lights: list[Light] = []
                 for light in room["children"]:
                     lights.append(Light(light['rid']))
                 self.rooms.append(Room(id, name, False, lights))
@@ -219,22 +215,19 @@ class Hue:
     def get_automation_state(self, automation_id=0):
         alive_threads = {}
 
-        # Remove terminated threads from the dictionary
         for thread_name, thread_info in list(self.threads.items()):
             thread, exit_flag = thread_info
             if thread.is_alive():
                 alive_threads[thread_name] = thread_info
 
-        self.threads = alive_threads  # Update the threads dictionary
+        self.threads = alive_threads
 
         if not self.threads:
             return {"status": "no automation running"}
 
         if automation_id == 0:
-            # Check the state of all threads
             response_json_array = [{"id": thread_name, "is_alive": thread_info[0].is_alive()} for thread_name, thread_info in self.threads.items()]
         else:
-            # Check the state of a specific thread
             response_json_array = {"status": "alive"} if str(automation_id) in self.threads else [{"status": "not found"}]
 
         return response_json_array
@@ -245,8 +238,8 @@ class Hue:
 
         if automation_id in self.threads:
             thread, exit_flag = self.threads[automation_id]
-            exit_flag.set()  # Set the flag to signal the thread to exit
-            thread.join()  # Wait for the thread to finish
+            exit_flag.set()
+            thread.join()
             del self.threads[automation_id]
             print(f"Thread {automation_id} killed.")
             return {"status": "stopped"}
@@ -285,7 +278,6 @@ class Hue:
             else:
                 print(f'Request failed with status: {response.status_code}')
         except requests.exceptions.RequestException as e:
-            # Handle any errors that occurred during the request
             print('Requests error:', e)
 
         return data['data']
@@ -310,7 +302,6 @@ class Hue:
             else:
                 print(f'Request failed with status: {response.status_code}')
         except requests.exceptions.RequestException as e:
-            # Handle any errors that occurred during the request
             print('Requests error:', e)
 
     def get_light_state(self, id):
@@ -329,7 +320,6 @@ class Hue:
             else:
                 print(f'Request failed with status: {response.status_code}')
         except requests.exceptions.RequestException as e:
-            # Handle any errors that occurred during the request
             print('Requests error:', e)
 
 
@@ -342,5 +332,3 @@ class Hue:
             light.brightness = int(data['data'][0]['dimming']['brightness'])
 
         return light
-
-

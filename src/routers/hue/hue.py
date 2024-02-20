@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from routers.hue.hue_service import Hue, Room
+from routers.hue.hue_service import Hue
 
 class Dimm(BaseModel):
     light_id: str
