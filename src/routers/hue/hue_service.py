@@ -42,7 +42,7 @@ class Room():
 
 load_dotenv()
 
-class Hue:
+class HueService:
     rooms: list[Room] = []
     threads = {}
 

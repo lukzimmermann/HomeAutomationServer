@@ -1,12 +1,8 @@
 import os
-import sys
 import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, joinedload
 from shelly import Data, Shelly
-
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-sys.path.append(parent_dir)
 
 from models.model import SensorLogModel, SensorModel
 

@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import routers.hue.hue as hue_router
+from src.routers.hue.hue import router as hue_router
 
 description = """
-😎
+😎 
 """
 
 app = FastAPI(title="HomeAutomationServer", description=description)
-app.include_router(hue_router.router)
+app.include_router(hue_router)
+
 
 app.add_middleware(
     CORSMiddleware,
