@@ -1,12 +1,12 @@
 import os
-import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, joinedload
-from shelly import Data, Shelly
+from src.models.model import SensorModel, SensorLogModel
+from src.routers.sensor.shelly import Shelly, Data
+from src.utils.singleton import singleton
 
-from models.model import SensorLogModel, SensorModel
 
-
+@singleton
 class SensorHandler():
     def __init__(self) -> None:
         self.sensor_list = []
@@ -14,20 +14,21 @@ class SensorHandler():
         
         self.load_sensors()
 
-        self.start()
-
-        time.sleep(300)
-
-        self.stop()
-
     def load_sensors(self) -> list[SensorModel]:
         self. sensor_list = []
+        self.shellys = []
 
-        try:
+        try: 
             engine = create_engine(os.getenv("POSTGRES_CONNECTION"))
             Session = sessionmaker(bind=engine)
             session = Session()
             sensors = session.query(SensorModel).options(joinedload(SensorModel.channels)).all()
+
+            for sensor in sensors:
+                if sensor.type == 'SHELLY_2PM':
+                    shelly = Shelly(sensor.id, sensor.ip_address, sensor.type)
+                    shelly.get_data()
+                    self.shellys.append()
         except:
             print("Error: Could not load sensors from db")
         finally:
@@ -36,24 +37,22 @@ class SensorHandler():
 
         return sensors
     
-    def get_sensor_by_id(self, id: int) -> SensorModel:
-        for sensor in self.sensor_list:
-            if sensor.id == id:
-                return sensor
-        
-        return None
+    def get_sensor_instance(self, id: int) -> Shelly:
+        print("getSensorInstance")
+        for shelly in self.shellys:
+            print(f'ShellyId: {shelly.id}')
+            if shelly.id == id:
+                return shelly
 
     def start(self) -> None:
         self.stop()
 
         for sensor in self.sensor_list:
             if sensor.type == 'SHELLY_2PM':
-                print(sensor)
-                shelly = Shelly(sensor.id, sensor.ip_address, sensor.type)
-                
+                #shelly = Shelly(sensor.id, sensor.ip_address, sensor.type)
+                shelly = self.get_sensor_instance(sensor.id)
                 shelly_listener = self.ShellyListener(self)
                 shelly.add_listener(shelly_listener)
-                self.shellys.append(shelly)
 
                 shelly.start_recording(sensor.log_interval, sensor.collection_interval)
             else: print('Fuck off')
@@ -92,8 +91,5 @@ class SensorHandler():
                         log = SensorLogModel()
                         log.channel_id = channel.id
                         log.value = getattr(dataset[channel_index], attribute_name)
-                        print(f'{channel.display_name}: {log.value}{channel.unit}')
 
                         self.sensor_handler.write_log_to_database(log)
-
-                print()

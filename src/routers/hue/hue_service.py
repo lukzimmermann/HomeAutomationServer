@@ -10,6 +10,8 @@ import uuid
 from colormath.color_objects import xyYColor, sRGBColor
 from colormath.color_conversions import convert_color
 
+requests.packages.urllib3.disable_warnings()
+
 
 class HueEndPointTyp(Enum):
     ROOM = 'room'

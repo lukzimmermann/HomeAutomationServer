@@ -1,10 +1,8 @@
 #Decorator for singleton pattern
-def singleton(cls):
+def singleton(class_):
     instances = {}
-
     def get_instance(*args, **kwargs):
-        if cls not in instances:
-            instances[cls] = cls(*args, **kwargs)
-        return instances[cls]
-
+        if class_ not in instances:
+            instances[class_] = class_(*args, **kwargs)
+        return instances[class_]
     return get_instance
